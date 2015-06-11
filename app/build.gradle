@@ -1,5 +1,20 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'me.tatarka:gradle-retrolambda:3.1.0'
+    }
+}
+
+// Required because retrolambda is on maven central
+repositories {
+    mavenCentral()
+}
+
 apply plugin: 'com.android.application'
-//apply plugin: 'me.tatarka.retrolambda'
+apply plugin: 'me.tatarka.retrolambda'
 
 android {
     compileSdkVersion 22
@@ -7,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId "c.mars.geolocationex"
-        minSdkVersion 15
+        minSdkVersion 9
         targetSdkVersion 22
         versionCode 1
         versionName "1.0"
@@ -31,5 +46,4 @@ dependencies {
     compile 'com.jakewharton:butterknife:6.1.0'
     compile 'com.jakewharton.timber:timber:3.1.0'
     provided 'org.projectlombok:lombok:1.16.4'
-    compile 'net.orfjackal.retrolambda:retrolambda:2.0.3'
 }
