@@ -41,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
                 if(l!=null){
                     t.setText(l.toString());
                 }
-            } else {get location
+            } else {
                 String s = "connected: " + connected;
                 Timber.d(s);
                 t.setText(s);
