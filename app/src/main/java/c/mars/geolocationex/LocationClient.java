@@ -1,6 +1,7 @@
 package c.mars.geolocationex;
 
 import android.content.Context;
+import android.location.Location;
 import android.os.Bundle;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -52,6 +53,11 @@ public class LocationClient {
     public void disconnect(){
         client.disconnect();
     }
+
+    public Location getLocation(){
+        return LocationServices.FusedLocationApi.getLastLocation(client);
+    }
+
     interface Callbacks{
         void connected(boolean b);
     }
