@@ -6,6 +6,7 @@ import android.os.Bundle;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
 import lombok.Data;
@@ -18,10 +19,12 @@ public class LocationClient {
     final private GoogleApiClient client;
     final private Context context;
     final private Callbacks callbacks;
+    private boolean connected;
+
     private GoogleApiClient.ConnectionCallbacks connectionCallbacks=new GoogleApiClient.ConnectionCallbacks() {
         @Override
         public void onConnected(Bundle bundle) {
-            callbacks.connected(true);
+            callbacks.connected(connected=true);
         }
 
         @Override
@@ -32,9 +35,10 @@ public class LocationClient {
     private GoogleApiClient.OnConnectionFailedListener failedListener=new GoogleApiClient.OnConnectionFailedListener() {
         @Override
         public void onConnectionFailed(ConnectionResult connectionResult) {
-            callbacks.connected(false);
+            callbacks.connected(connected=false);
         }
     };
+    private LocationRequest locationRequest;
 
     public LocationClient(Context context, Callbacks callbacks) {
         this.context = context;
@@ -58,6 +62,12 @@ public class LocationClient {
         return LocationServices.FusedLocationApi.getLastLocation(client);
     }
 
+    protected void createLocationRequest() {
+        locationRequest= new LocationRequest();
+        locationRequest.setInterval(10_000);
+        locationRequest.setFastestInterval(5_000);
+        locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+    }
     interface Callbacks{
         void connected(boolean b);
     }
