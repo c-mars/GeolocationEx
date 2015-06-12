@@ -79,7 +79,7 @@ public class LocationClient {
         LocationRequest locationRequest= new LocationRequest();
         locationRequest.setInterval(10_000);
         locationRequest.setFastestInterval(5_000);
-        locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         locationListener = location -> listener.update(location);
 
@@ -89,5 +89,9 @@ public class LocationClient {
     public void unsubscribe(){
         LocationServices.FusedLocationApi.removeLocationUpdates(client, locationListener);
         listener=null;
+    }
+
+    public boolean isSubscribed(){
+        return listener!=null;
     }
 }

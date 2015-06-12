@@ -34,8 +34,8 @@ public class MainActivity extends AppCompatActivity {
     @InjectView(R.id.gf)
     Button gf;
     View[] vs;
-    private boolean b;
     private LocationClient locationClient;
+    private Boolean m = false;
 
     @OnClick(R.id.cl)
     void cl() {
@@ -49,7 +49,15 @@ public class MainActivity extends AppCompatActivity {
 
     @OnClick(R.id.lu)
     void lu() {
-        locationClient.subscribe(location -> t.setText(location.toString()));
+        if (!locationClient.isSubscribed()) {
+            locationClient.subscribe(location -> t.setText(((m = !m) ? "|" : "-") + " " + location.toString()));
+            lu.setText("unsubscr");
+        } else {
+            locationClient.unsubscribe();
+            t.setText("");
+            Toast.makeText(this, "unsubscribed", Toast.LENGTH_LONG);
+            lu.setText("subscr");
+        }
     }
 
     @OnClick(R.id.gf)
