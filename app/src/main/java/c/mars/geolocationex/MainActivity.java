@@ -11,6 +11,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
@@ -41,12 +42,14 @@ public class MainActivity extends AppCompatActivity {
         Location l = locationClient.getLocation();
         if (l != null) {
             t.setText(l.toString());
+        } else {
+            Toast.makeText(this, "Location unavailable", Toast.LENGTH_SHORT).show();
         }
     }
 
     @OnClick(R.id.lu)
     void lu() {
-
+        locationClient.subscribe(location -> t.setText(location.toString()));
     }
 
     @OnClick(R.id.gf)
@@ -68,7 +71,6 @@ public class MainActivity extends AppCompatActivity {
 
         vs = new View[]{cl, lu, gf};
         locationClient = new LocationClient(this, connected -> {
-
             if (connected) {
                 enable();
                 Location l = locationClient.getLocation();

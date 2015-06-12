@@ -6,6 +6,7 @@ import android.os.Bundle;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
@@ -39,7 +40,6 @@ public class LocationClient {
             callbacks.connected(connected=false);
         }
     };
-    private LocationRequest locationRequest;
 
     public LocationClient(Context context, Callbacks callbacks) {
         this.context = context;
@@ -63,13 +63,31 @@ public class LocationClient {
         return (connected? LocationServices.FusedLocationApi.getLastLocation(client):null);
     }
 
-    protected void createLocationRequest() {
-        locationRequest= new LocationRequest();
+    interface Callbacks{
+        void connected(boolean b);
+    }
+
+    interface LocationChangesListener{
+        void update(Location location);
+    }
+    private LocationChangesListener listener;
+
+    private LocationListener locationListener;
+    public void subscribe(LocationChangesListener listener){
+        this.listener=listener;
+
+        LocationRequest locationRequest= new LocationRequest();
         locationRequest.setInterval(10_000);
         locationRequest.setFastestInterval(5_000);
         locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+
+        locationListener = location -> listener.update(location);
+
+        LocationServices.FusedLocationApi.requestLocationUpdates(client, locationRequest, locationListener);
     }
-    interface Callbacks{
-        void connected(boolean b);
+
+    public void unsubscribe(){
+        LocationServices.FusedLocationApi.removeLocationUpdates(client, locationListener);
+        listener=null;
     }
 }
