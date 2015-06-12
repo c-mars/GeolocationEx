@@ -10,6 +10,7 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
 import lombok.Data;
+import lombok.Getter;
 
 /**
  * Created by mars on 6/11/15.
@@ -19,7 +20,7 @@ public class LocationClient {
     final private GoogleApiClient client;
     final private Context context;
     final private Callbacks callbacks;
-    private boolean connected;
+    @Getter private boolean connected;
 
     private GoogleApiClient.ConnectionCallbacks connectionCallbacks=new GoogleApiClient.ConnectionCallbacks() {
         @Override
@@ -59,7 +60,7 @@ public class LocationClient {
     }
 
     public Location getLocation(){
-        return LocationServices.FusedLocationApi.getLastLocation(client);
+        return (connected? LocationServices.FusedLocationApi.getLastLocation(client):null);
     }
 
     protected void createLocationRequest() {
