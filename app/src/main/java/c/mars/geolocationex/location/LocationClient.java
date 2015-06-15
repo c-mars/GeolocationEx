@@ -79,7 +79,7 @@ public class LocationClient {
                 .addConnectionCallbacks(this.connectionCallbacks)
                 .addOnConnectionFailedListener(this.failedListener)
                 .build();
-        receiver=new BroadcastReceiver() {
+        geofencingReceiver=new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 if(intent.getAction().equals(TA)) {
@@ -88,7 +88,7 @@ public class LocationClient {
                 }
             }
         };
-        context.registerReceiver(receiver, new IntentFilter(TA));
+        context.registerReceiver(geofencingReceiver, new IntentFilter(TA));
     }
 
     public void connect() {
@@ -370,5 +370,5 @@ public class LocationClient {
         void transition(String m);
     }
     private GeofencingCallback geofencingCallback;
-    BroadcastReceiver receiver;
+    BroadcastReceiver geofencingReceiver;
 }
