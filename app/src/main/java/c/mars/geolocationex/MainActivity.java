@@ -40,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
     @OnClick(R.id.cl)
     void cl() {
         Location l = locationClient.getLocation();
-        locationClient.resolveAddress(l, address -> t.append(" - "+address));
+        locationClient.resolveAddress(l, address -> t.append("\n - "+address));
         if (l != null) {
             t.setText(l.toString());
         } else {

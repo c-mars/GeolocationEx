@@ -1,6 +1,8 @@
 package c.mars.geolocationex.location;
 
+import android.app.IntentService;
 import android.content.Context;
+import android.content.Intent;
 import android.location.Location;
 import android.os.Bundle;
 
@@ -127,5 +129,17 @@ public class LocationClient {
 
     interface Updater{
         void update(String m);
+    }
+
+    public static class GoefenceIntentService extends IntentService {
+
+        public GoefenceIntentService() {
+            super(GoefenceIntentService.class.getName());
+        }
+
+        @Override
+        protected void onHandleIntent(Intent intent) {
+
+        }
     }
 }
