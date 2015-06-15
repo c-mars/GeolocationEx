@@ -35,11 +35,12 @@ public class MainActivity extends AppCompatActivity {
     Button gf;
     View[] vs;
     private LocationClient locationClient;
-    private Boolean m = false;
+    private Boolean marker = false;
 
     @OnClick(R.id.cl)
     void cl() {
         Location l = locationClient.getLocation();
+        locationClient.resolveAddress(l, address -> t.append(" - "+address));
         if (l != null) {
             t.setText(l.toString());
         } else {
@@ -50,7 +51,10 @@ public class MainActivity extends AppCompatActivity {
     @OnClick(R.id.lu)
     void lu() {
         if (!locationClient.isSubscribed()) {
-            locationClient.subscribe(location -> t.setText(((m = !m) ? "|" : "-") + " " + location.toString()));
+            locationClient.subscribe(location -> {
+                t.setText(((marker = !marker) ? "|" : "-") + " " + location.toString());
+                locationClient.resolveAddress(location, address -> t.append(" - " + address));
+            });
             lu.setText("unsubscr");
         } else {
             locationClient.unsubscribe();
@@ -78,6 +82,7 @@ public class MainActivity extends AppCompatActivity {
         Timber.plant(new Timber.DebugTree());
 
         vs = new View[]{cl, lu, gf};
+
         locationClient = new LocationClient(this, connected -> {
             if (connected) {
                 enable();
@@ -93,6 +98,16 @@ public class MainActivity extends AppCompatActivity {
         });
 
         draw(i);
+
+        if (savedInstanceState != null) {
+            locationClient.restoreValuesFromBundle(savedInstanceState, location -> t.setText(location.toString()), m -> t.append(" last: " + m));
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        locationClient.saveInstanceState(outState);
+        super.onSaveInstanceState(outState);
     }
 
     @Override
