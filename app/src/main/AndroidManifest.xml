@@ -20,6 +20,7 @@
         </activity>
 
         <service android:name=".LocationClient$LocationIntentService" android:exported="false"/>
+        <service android:name=".location.LocationClient$GeofenceIntentService" android:exported="false"/>
     </application>
 
 </manifest>
