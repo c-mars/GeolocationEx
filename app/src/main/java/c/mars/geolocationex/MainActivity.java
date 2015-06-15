@@ -70,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
     @OnClick(R.id.gf)
     void gf() {
 
+//        todo display map to select geofence manually, change radius
         if(gfOn=!gfOn) {
             Location location=locationClient.getLocation();
             locationClient.addGeofence("geo", location, 10, 10000);
