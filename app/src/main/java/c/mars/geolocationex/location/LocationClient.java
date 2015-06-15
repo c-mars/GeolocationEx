@@ -2,14 +2,21 @@ package c.mars.geolocationex.location;
 
 import android.app.IntentService;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.ResultReceiver;
+import android.text.TextUtils;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.Result;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.GeofencingEvent;
@@ -18,12 +25,15 @@ import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
+import java.io.IOException;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import lombok.Data;
 import lombok.Getter;
+import timber.log.Timber;
 
 /**
  * Created by mars on 6/11/15.
@@ -37,6 +47,7 @@ public class LocationClient {
     final private Context context;
     final private Callbacks callbacks;
     private LocationListener listener;
+    private AddressCallback addressCallback;
     @Getter
     private boolean connected;
     private Location lastLoc;
@@ -58,7 +69,8 @@ public class LocationClient {
             callbacks.connected(connected = false);
         }
     };
-
+    private static final String TRANSITION="TRANSITION";
+    private static final String TA="TA";
     public LocationClient(Context context, Callbacks callbacks) {
         this.context = context;
         this.callbacks = callbacks;
@@ -67,6 +79,16 @@ public class LocationClient {
                 .addConnectionCallbacks(this.connectionCallbacks)
                 .addOnConnectionFailedListener(this.failedListener)
                 .build();
+        receiver=new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if(intent.getAction().equals(TA)) {
+                    String m = intent.getStringExtra(TRANSITION);
+                    geofencingCallback.transition(m);
+                }
+            }
+        };
+        context.registerReceiver(receiver, new IntentFilter(TA));
     }
 
     public void connect() {
@@ -128,46 +150,138 @@ public class LocationClient {
         }
     }
 
-    interface Callbacks {
+    private Location lastLocation = null;
+    private boolean addressRequested = false;
+    private AddressResultReceiver receiver;
+    public void resolveAddress(Location location, AddressCallback addressCallback) {
+        this.addressCallback = addressCallback;
+
+        if (!client.isConnected() || location == null) {
+            lastLocation = location;
+            addressRequested = true;
+            return;
+        }
+
+        Intent intent = new Intent(context, LocationIntentService.class);
+        intent.putExtra(LocationIntentService.REC, receiver);
+        intent.putExtra(LocationClient.LocationIntentService.LOC_E, location);
+        context.startService(intent);
+    }
+
+    public interface Callbacks {
         void connected(boolean b);
     }
 
-    interface LocationChangesListener {
+    public interface LocationChangesListener {
         void update(Location location);
     }
 
-    interface Updater {
+    public interface Updater {
         void update(String m);
     }
 
-    public static class GeofenceIntentService extends IntentService {
+    public interface AddressCallback {
+        void onAddress(String address);
+    }
 
-        public GeofenceIntentService() {
-            super(GeofenceIntentService.class.getName());
+    public static class LocationIntentService extends IntentService {
+
+        public static final int SUCC = 0;
+        public static final int FAIL = 1;
+        public static final String PKG = LocationIntentService.class.getPackage().getName();
+        public static final String REC = PKG + ".REC";
+        public static final String RES_K = PKG + ".RES_K";
+        public static final String LOC_E = PKG + ".LOC_E";
+        private ResultReceiver receiver;
+
+        public LocationIntentService() {
+            super(LocationIntentService.class.getName());
+        }
+
+        @Override
+        protected void onHandleIntent(Intent intent) {
+            String m = "";
+            Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+            Location location = intent.getParcelableExtra(LOC_E);
+            receiver = intent.getParcelableExtra(REC);
+
+            List<Address> addresses = null;
+            try {
+                addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+            } catch (IOException e) {
+                m = "Service not available";
+            } catch (IllegalArgumentException ia) {
+                m = "Invalid location: [lat=" + location.getLatitude() + ", long=" + location.getLongitude() + "]";
+            }
+
+            if (addresses == null || addresses.isEmpty()) {
+                if (m.isEmpty()) {
+                    m = "No addresses found";
+                }
+                deliverResultToReceiver(FAIL, m);
+            } else {
+                Address address = addresses.get(0);
+                ArrayList<String> aFrags = new ArrayList<>();
+                for (int i = 0; i < address.getMaxAddressLineIndex(); i++) {
+                    aFrags.add(address.getAddressLine(i));
+                }
+                deliverResultToReceiver(SUCC, TextUtils.join(System.getProperty("line.separator"), aFrags));
+            }
+
+        }
+
+        private void deliverResultToReceiver(int rCode, String m) {
+            Bundle bundle = new Bundle();
+            bundle.putString(RES_K, m);
+            receiver.send(rCode, bundle);
+        }
+
+    }
+
+    private class AddressResultReceiver extends ResultReceiver {
+
+        public AddressResultReceiver(Handler handler) {
+            super(handler);
+        }
+
+        @Override
+        protected void onReceiveResult(int resultCode, Bundle resultData) {
+            String m = resultData.getString(LocationIntentService.RES_K);
+            addressCallback.onAddress(m);
+            if (resultCode == LocationIntentService.SUCC) {
+                Toast.makeText(context, "Resolved", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    public static class GeofencingIntentService extends IntentService {
+
+        public GeofencingIntentService() {
+            super(GeofencingIntentService.class.getName());
         }
 
         @Override
         protected void onHandleIntent(Intent intent) {
 
-//            todo implement
             GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
             if (geofencingEvent.hasError()) {
+//                geofencingEvent.getErrorCode();
 //                String errorMessage = GeofenceErrorMessages.getErrorString(this,
 //                        geofencingEvent.getErrorCode());
                 return;
             }
 
-            // Get the transition type.
-            int geofenceTransition = geofencingEvent.getGeofenceTransition();
+            Integer geofenceTransition = geofencingEvent.getGeofenceTransition();
 
-            // Test that the reported transition was of interest.
-            if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER ||
-                    geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
+            Intent i=new Intent(TA);
+            i.putExtra(TRANSITION, geofenceTransition.toString());
+            sendBroadcast(i);
 
-                // Get the geofences that were triggered. A single event can trigger
-                // multiple geofences.
-                List triggeringGeofences = geofencingEvent.getTriggeringGeofences();
+            if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER || geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
 
+            List triggeringGeofences = geofencingEvent.getTriggeringGeofences();
+
+                Timber.d(triggeringGeofences.toString());
                 // Get the transition details as a String.
 //                String geofenceTransitionDetails = getGeofenceTransitionDetails(
 //                        this,
@@ -186,40 +300,21 @@ public class LocationClient {
     }
 
 
-    public void geofencingStop() {
-        LocationServices.GeofencingApi.removeGeofences(client, getGeofencePendingIntent()).setResultCallback(this);
-    }
 
-    private class Entry {
-        public String id;
-        public Location location;
-        public float radius;
 
-        public Entry(String id, Location location, float radius) {
-            this.id = id;
-            this.location = location;
-            this.radius = radius;
-        }
-    }
+//    private class Entry {
+//        public String id;
+//        public Location location;
+//        public float radius;
+//
+//        public Entry(String id, Location location, float radius) {
+//            this.id = id;
+//            this.location = location;
+//            this.radius = radius;
+//        }
+//    }
 
-    private List<Geofence> geofences = new ArrayList<>();
-    private List<Entry> entries = new ArrayList<>();
 
-    public void addGeofence(String id, Location location, float r, long expiration) {
-        Entry entry = new Entry(id, location, r);
-        entries.add(entry);
-
-        geofences.add(new Geofence.Builder()
-                .setRequestId(id)
-                .setCircularRegion(
-                        location.getLatitude(),
-                        location.getLongitude(),
-                        r
-                )
-                .setExpirationDuration(expiration)
-                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_EXIT)
-                .build());
-    }
 
     private GeofencingRequest getGeofencingRequest() {
         GeofencingRequest.Builder builder = new GeofencingRequest.Builder();
@@ -235,18 +330,45 @@ public class LocationClient {
             return geofencePendingIntent;
         }
 
-        Intent intent = new Intent(context, GeofenceIntentService.class);
+        Intent intent = new Intent(context, GeofencingIntentService.class);
         return PendingIntent.getService(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     ResultCallback resultCallback;
-    public void addGeofences() {
-        resultCallback=new ResultCallback() {
-            @Override
-            public void onResult(Result result) {
 
-            }
+
+    public void geofencingStart(GeofencingCallback geofencingCallback) {
+        this.geofencingCallback=geofencingCallback;
+        resultCallback= result -> {
+            Timber.d(result.toString());
+            geofencingCallback.transition("add geo res: "+result.toString());
         };
         LocationServices.GeofencingApi.addGeofences( client, getGeofencingRequest(), getGeofencePendingIntent()).setResultCallback(resultCallback);
     }
+
+    public void geofencingStop() {
+        LocationServices.GeofencingApi.removeGeofences(client, getGeofencePendingIntent()).setResultCallback(resultCallback);
+    }
+
+    private List<Geofence> geofences = new ArrayList<>();
+
+    public void addGeofence(String id, Location location, float r, long expiration) {
+
+        geofences.add(new Geofence.Builder()
+                .setRequestId(id)
+                .setCircularRegion(
+                        location.getLatitude(),
+                        location.getLongitude(),
+                        r
+                )
+                .setExpirationDuration(expiration)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_EXIT)
+                .build());
+    }
+
+    public interface GeofencingCallback{
+        void transition(String m);
+    }
+    private GeofencingCallback geofencingCallback;
+    BroadcastReceiver receiver;
 }

@@ -21,6 +21,8 @@ import butterknife.InjectView;
 import butterknife.OnClick;
 import timber.log.Timber;
 
+import c.mars.geolocationex.location.LocationClient;
+
 public class MainActivity extends AppCompatActivity {
 
     @InjectView(R.id.t)
@@ -51,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
     @OnClick(R.id.lu)
     void lu() {
         if (!locationClient.isSubscribed()) {
-            locationClient.subscribe(location -> {
+            locationClient.subscribe(                    location -> {
                 t.setText(((marker = !marker) ? "|" : "-") + " " + location.toString());
                 locationClient.resolveAddress(location, address -> t.append(" - " + address));
             });
@@ -64,9 +66,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private boolean gfOn=false;
     @OnClick(R.id.gf)
     void gf() {
 
+        if(gfOn=!gfOn) {
+            Location location=locationClient.getLocation();
+            locationClient.addGeofence("geo", location, 10, 10000);
+            locationClient.geofencingStart(m -> t.setText("geo tr: "+m));
+        }else {
+            locationClient.geofencingStop();
+        }
     }
 
     private void enable() {
@@ -89,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
                 Location l = locationClient.getLocation();
                 if (l != null) {
                     t.setText(l.toString());
+                    locationClient.resolveAddress(l, address -> t.append(" - " + address));
                 }
             } else {
                 String s = "connected: " + connected;
