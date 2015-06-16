@@ -1,35 +1,28 @@
 package c.mars.geolocationex.location;
 
-import android.app.IntentService;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.location.Address;
-import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
-import android.text.TextUtils;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.Geofence;
-import com.google.android.gms.location.GeofencingEvent;
 import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
-import java.io.IOException;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import lombok.Data;
 import lombok.Getter;
@@ -39,13 +32,17 @@ import timber.log.Timber;
  * Created by mars on 6/11/15.
  */
 @Data
-public class LocationClient {
+public class LocationClient implements LocationInterface {
+    public static final String TRANSITION="TRANSITION";
+    public static final String TA="TA";
     private final static String REQ_LOC_UP = "REQ_LOC_UP";
     private final static String LOC_K = "LOC_K";
     private final static String TIME_K = "TIME_K";
     final private GoogleApiClient client;
     final private Context context;
     final private Callbacks callbacks;
+    ResultCallback resultCallback;
+    BroadcastReceiver geofencingReceiver;
     private LocationListener listener;
     private AddressCallback addressCallback;
     @Getter
@@ -69,8 +66,13 @@ public class LocationClient {
             callbacks.connected(connected = false);
         }
     };
-    private static final String TRANSITION="TRANSITION";
-    private static final String TA="TA";
+    private Location lastLocation = null;
+    private boolean addressRequested = false;
+    private AddressResultReceiver receiver;
+    private PendingIntent geofencePendingIntent;
+    private List<Geofence> geofences = new ArrayList<>();
+    private GeofencingCallback geofencingCallback;
+
     public LocationClient(Context context, Callbacks callbacks) {
         this.context = context;
         this.callbacks = callbacks;
@@ -91,19 +93,23 @@ public class LocationClient {
         context.registerReceiver(geofencingReceiver, new IntentFilter(TA));
     }
 
+    @Override
     public void connect() {
         client.connect();
     }
 
+    @Override
     public void disconnect() {
         client.disconnect();
     }
 
+    @Override
     public Location getLocation() {
         return (connected ? LocationServices.FusedLocationApi.getLastLocation(client) : null);
     }
 
-    public void subscribe(LocationChangesListener locationChangesListener) {
+    @Override
+    public void subscribeForLocation(LocationChangesListener locationChangesListener) {
 
         LocationRequest locationRequest = new LocationRequest();
         locationRequest.setInterval(10_000);
@@ -119,7 +125,8 @@ public class LocationClient {
         LocationServices.FusedLocationApi.requestLocationUpdates(client, locationRequest, this.listener);
     }
 
-    public void unsubscribe() {
+    @Override
+    public void unsubscribeFromLocation() {
         LocationServices.FusedLocationApi.removeLocationUpdates(client, listener);
         listener = null;
     }
@@ -128,16 +135,18 @@ public class LocationClient {
         return listener != null;
     }
 
+    @Override
     public void saveInstanceState(Bundle savedInstanceState) {
         savedInstanceState.putBoolean(REQ_LOC_UP, listener != null);
         savedInstanceState.putParcelable(LOC_K, lastLoc);
         savedInstanceState.putString(TIME_K, lastTime);
     }
 
+    @Override
     public void restoreValuesFromBundle(Bundle savedInstanceState, LocationChangesListener locationChangesListener, Updater updater) {
         if (savedInstanceState != null) {
             if (savedInstanceState.keySet().contains(REQ_LOC_UP)) {
-                subscribe(locationChangesListener);
+                subscribeForLocation(locationChangesListener);
             }
 
             if (savedInstanceState.keySet().contains(LOC_K) && savedInstanceState.keySet().contains(TIME_K)) {
@@ -149,157 +158,6 @@ public class LocationClient {
 
         }
     }
-
-    private Location lastLocation = null;
-    private boolean addressRequested = false;
-    private AddressResultReceiver receiver;
-    public void resolveAddress(Location location, AddressCallback addressCallback) {
-        this.addressCallback = addressCallback;
-
-        if (!client.isConnected() || location == null) {
-            lastLocation = location;
-            addressRequested = true;
-            return;
-        }
-
-        Intent intent = new Intent(context, LocationIntentService.class);
-        intent.putExtra(LocationIntentService.REC, receiver);
-        intent.putExtra(LocationClient.LocationIntentService.LOC_E, location);
-        context.startService(intent);
-    }
-
-    public interface Callbacks {
-        void connected(boolean b);
-    }
-
-    public interface LocationChangesListener {
-        void update(Location location);
-    }
-
-    public interface Updater {
-        void update(String m);
-    }
-
-    public interface AddressCallback {
-        void onAddress(String address);
-    }
-
-    public static class LocationIntentService extends IntentService {
-
-        public static final int SUCC = 0;
-        public static final int FAIL = 1;
-        public static final String PKG = LocationIntentService.class.getPackage().getName();
-        public static final String REC = PKG + ".REC";
-        public static final String RES_K = PKG + ".RES_K";
-        public static final String LOC_E = PKG + ".LOC_E";
-        private ResultReceiver receiver;
-
-        public LocationIntentService() {
-            super(LocationIntentService.class.getName());
-        }
-
-        @Override
-        protected void onHandleIntent(Intent intent) {
-            String m = "";
-            Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-            Location location = intent.getParcelableExtra(LOC_E);
-            receiver = intent.getParcelableExtra(REC);
-
-            List<Address> addresses = null;
-            try {
-                addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
-            } catch (IOException e) {
-                m = "Service not available";
-            } catch (IllegalArgumentException ia) {
-                m = "Invalid location: [lat=" + location.getLatitude() + ", long=" + location.getLongitude() + "]";
-            }
-
-            if (addresses == null || addresses.isEmpty()) {
-                if (m.isEmpty()) {
-                    m = "No addresses found";
-                }
-                deliverResultToReceiver(FAIL, m);
-            } else {
-                Address address = addresses.get(0);
-                ArrayList<String> aFrags = new ArrayList<>();
-                for (int i = 0; i < address.getMaxAddressLineIndex(); i++) {
-                    aFrags.add(address.getAddressLine(i));
-                }
-                deliverResultToReceiver(SUCC, TextUtils.join(System.getProperty("line.separator"), aFrags));
-            }
-
-        }
-
-        private void deliverResultToReceiver(int rCode, String m) {
-            Bundle bundle = new Bundle();
-            bundle.putString(RES_K, m);
-            receiver.send(rCode, bundle);
-        }
-
-    }
-
-    private class AddressResultReceiver extends ResultReceiver {
-
-        public AddressResultReceiver(Handler handler) {
-            super(handler);
-        }
-
-        @Override
-        protected void onReceiveResult(int resultCode, Bundle resultData) {
-            String m = resultData.getString(LocationIntentService.RES_K);
-            addressCallback.onAddress(m);
-            if (resultCode == LocationIntentService.SUCC) {
-                Toast.makeText(context, "Resolved", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    public static class GeofencingIntentService extends IntentService {
-
-        public GeofencingIntentService() {
-            super(GeofencingIntentService.class.getName());
-        }
-
-        @Override
-        protected void onHandleIntent(Intent intent) {
-
-            GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
-            if (geofencingEvent.hasError()) {
-//                geofencingEvent.getErrorCode();
-//                String errorMessage = GeofenceErrorMessages.getErrorString(this,
-//                        geofencingEvent.getErrorCode());
-                return;
-            }
-
-            Integer geofenceTransition = geofencingEvent.getGeofenceTransition();
-
-            Intent i=new Intent(TA);
-            i.putExtra(TRANSITION, geofenceTransition.toString());
-            sendBroadcast(i);
-
-            if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER || geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
-
-            List triggeringGeofences = geofencingEvent.getTriggeringGeofences();
-
-                Timber.d(triggeringGeofences.toString());
-                // Get the transition details as a String.
-//                String geofenceTransitionDetails = getGeofenceTransitionDetails(
-//                        this,
-//                        geofenceTransition,
-//                        triggeringGeofences
-//                );
-
-                // Send notification and log the transition details.
-//                sendNotification(geofenceTransitionDetails);
-
-            } else {
-                // Log the error.
-
-            }
-        }
-    }
-
-
 
 
 //    private class Entry {
@@ -314,7 +172,21 @@ public class LocationClient {
 //        }
 //    }
 
+    @Override
+    public void resolveAddress(Location location, AddressCallback addressCallback) {
+        this.addressCallback = addressCallback;
 
+        if (!client.isConnected() || location == null) {
+            lastLocation = location;
+            addressRequested = true;
+            return;
+        }
+
+        Intent intent = new Intent(context, LocationAddressIntentService.class);
+        intent.putExtra(LocationAddressIntentService.REC, receiver);
+        intent.putExtra(LocationAddressIntentService.LOC_E, location);
+        context.startService(intent);
+    }
 
     private GeofencingRequest getGeofencingRequest() {
         GeofencingRequest.Builder builder = new GeofencingRequest.Builder();
@@ -322,8 +194,6 @@ public class LocationClient {
         builder.addGeofences(geofences);
         return builder.build();
     }
-
-    private PendingIntent geofencePendingIntent;
 
     private PendingIntent getGeofencePendingIntent() {
         if (geofencePendingIntent != null) {
@@ -334,41 +204,53 @@ public class LocationClient {
         return PendingIntent.getService(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
-    ResultCallback resultCallback;
-
-
+    @Override
     public void geofencingStart(GeofencingCallback geofencingCallback) {
         this.geofencingCallback=geofencingCallback;
         resultCallback= result -> {
             Timber.d(result.toString());
-            geofencingCallback.transition("add geo res: "+result.toString());
+            geofencingCallback.transition("result: "+result.toString());
         };
         LocationServices.GeofencingApi.addGeofences( client, getGeofencingRequest(), getGeofencePendingIntent()).setResultCallback(resultCallback);
     }
 
+    @Override
     public void geofencingStop() {
         LocationServices.GeofencingApi.removeGeofences(client, getGeofencePendingIntent()).setResultCallback(resultCallback);
     }
 
-    private List<Geofence> geofences = new ArrayList<>();
-
-    public void addGeofence(String id, Location location, float r, long expiration) {
+    @Override
+    public void addGeofence(String idString, Location location, float radiusMeters, long expiresInMs) {
 
         geofences.add(new Geofence.Builder()
-                .setRequestId(id)
+                .setRequestId(idString)
                 .setCircularRegion(
                         location.getLatitude(),
                         location.getLongitude(),
-                        r
+                        radiusMeters
                 )
-                .setExpirationDuration(expiration)
+                .setExpirationDuration(expiresInMs)
                 .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_EXIT)
                 .build());
     }
 
-    public interface GeofencingCallback{
-        void transition(String m);
+    public interface Callbacks {
+        void connected(boolean b);
     }
-    private GeofencingCallback geofencingCallback;
-    BroadcastReceiver geofencingReceiver;
+
+    private class AddressResultReceiver extends ResultReceiver {
+
+        public AddressResultReceiver(Handler handler) {
+            super(handler);
+        }
+
+        @Override
+        protected void onReceiveResult(int resultCode, Bundle resultData) {
+            String m = resultData.getString(LocationAddressIntentService.RES_K);
+            addressCallback.onAddress(m);
+            if (resultCode == LocationAddressIntentService.SUCC) {
+                Toast.makeText(context, "Resolved", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
 }

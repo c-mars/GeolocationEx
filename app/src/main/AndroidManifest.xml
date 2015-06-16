@@ -20,7 +20,7 @@
         </activity>
 
         <service android:name=".LocationClient$LocationIntentService" android:exported="false"/>
-        <service android:name=".location.LocationClient$GeofencingIntentService" android:exported="false"/>
+        <service android:name=".location.GeofencingIntentService" android:exported="false"/>
     </application>
 
 </manifest>

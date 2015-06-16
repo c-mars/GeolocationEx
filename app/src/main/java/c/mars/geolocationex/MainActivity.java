@@ -19,9 +19,9 @@ import com.caverock.androidsvg.SVGParseException;
 import butterknife.ButterKnife;
 import butterknife.InjectView;
 import butterknife.OnClick;
-import timber.log.Timber;
-
 import c.mars.geolocationex.location.LocationClient;
+import c.mars.geolocationex.location.LocationInterface;
+import timber.log.Timber;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,11 +33,13 @@ public class MainActivity extends AppCompatActivity {
     Button cl;
     @InjectView(R.id.lu)
     Button lu;
+
+    View[] vs;
     @InjectView(R.id.gf)
     Button gf;
-    View[] vs;
-    private LocationClient locationClient;
+    private LocationInterface locationClient;
     private Boolean marker = false;
+    private boolean gfOn=false;
 
     @OnClick(R.id.cl)
     void cl() {
@@ -53,30 +55,28 @@ public class MainActivity extends AppCompatActivity {
     @OnClick(R.id.lu)
     void lu() {
         if (!locationClient.isSubscribed()) {
-            locationClient.subscribe(                    location -> {
-                t.setText(((marker = !marker) ? "|" : "-") + " " + location.toString());
-                locationClient.resolveAddress(location, address -> t.append(" - " + address));
-            });
-            lu.setText("unsubscr");
+            locationClient.subscribeForLocation(location -> showLocation());
+            lu.setText("unsubscribe");
         } else {
-            locationClient.unsubscribe();
-            t.setText("");
-            Toast.makeText(this, "unsubscribed", Toast.LENGTH_LONG);
-            lu.setText("subscr");
+            locationClient.unsubscribeFromLocation();
+            t.setText("unsubscribed");
+            Toast.makeText(this, "unsubscribed", Toast.LENGTH_LONG).show();
+            lu.setText("subscribe");
         }
     }
 
-    private boolean gfOn=false;
     @OnClick(R.id.gf)
     void gf() {
 
 //        todo display map to select geofence manually, change radius
         if(gfOn=!gfOn) {
             Location location=locationClient.getLocation();
-            locationClient.addGeofence("geo", location, 10, 10000);
-            locationClient.geofencingStart(m -> t.setText("geo tr: "+m));
+            locationClient.addGeofence("geo", location, 5, 10*60*1000); // 5 meters, 10 minutes
+            locationClient.geofencingStart(m -> t.setText("geo transition: "+m));
+            gf.setText("geo on");
         }else {
             locationClient.geofencingStop();
+            gf.setText("geo off");
         }
     }
 
@@ -145,5 +145,10 @@ public class MainActivity extends AppCompatActivity {
         } catch (SVGParseException e) {
             e.printStackTrace();
         }
+    }
+
+    private void showLocation(){
+        Location location=locationClient.getLocation();
+        locationClient.resolveAddress(location, address -> t.setText(location.toString() + " - " + address));
     }
 }
