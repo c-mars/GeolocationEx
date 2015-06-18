@@ -19,9 +19,12 @@ import android.widget.Toast;
 
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
+import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 
 import butterknife.ButterKnife;
 import butterknife.InjectView;
@@ -141,9 +144,12 @@ public class MainActivity extends AppCompatActivity {
 
         map = (MapFragment) getFragmentManager().findFragmentById(R.id.map);
         if(map!=null) {
-            map.getMap().setMyLocationEnabled(true);
-            CircleOptions circleOptions=new CircleOptions();
+//            map.getMap().setMyLocationEnabled(true);
             LatLng ll = new LatLng(location.getLatitude(), location.getLongitude());
+
+            map.getMap().moveCamera(CameraUpdateFactory.newLatLngZoom(ll, 14));
+            CircleOptions circleOptions=new CircleOptions();
+
             circleOptions.center(ll);
             circleOptions.radius(100);
             circleOptions.fillColor(Color.argb(125, 0, 255, 0));
