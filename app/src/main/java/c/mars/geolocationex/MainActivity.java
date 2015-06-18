@@ -21,16 +21,20 @@ import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 
 import butterknife.ButterKnife;
 import butterknife.InjectView;
 import butterknife.OnClick;
 import c.mars.geolocationex.location.LocationClient;
 import c.mars.geolocationex.location.LocationInterface;
+import c.mars.geolocationex.location.MapManager;
 import c.mars.geolocationex.location.MapsActivity;
 import timber.log.Timber;
 
@@ -103,6 +107,7 @@ public class MainActivity extends AppCompatActivity {
             v.setEnabled(true);
     }
 
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -120,7 +125,8 @@ public class MainActivity extends AppCompatActivity {
                     t.setText(l.toString());
                     locationClient.resolveAddress(l, address -> t.append(" - " + address));
                 }
-                setMap();
+                map = (MapFragment) getFragmentManager().findFragmentById(R.id.map);
+                map.getMapAsync(mapReadyCallback);
             } else {
                 String s = "connected: " + connected;
                 Timber.d(s);
@@ -135,28 +141,45 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
-    private void setMap(){
-        Location location=locationClient.getLocation();
-        if(location==null){
-            return;
-        }
+    private OnMapReadyCallback mapReadyCallback = new OnMapReadyCallback() {
+        @Override
+        public void onMapReady(GoogleMap googleMap) {
+            Location location = locationClient.getLocation();
+            if (location == null) {
+                return;
+            }
 
-        map = (MapFragment) getFragmentManager().findFragmentById(R.id.map);
-        if(map!=null) {
 //            map.getMap().setMyLocationEnabled(true);
             LatLng ll = new LatLng(location.getLatitude(), location.getLongitude());
 
-            map.getMap().moveCamera(CameraUpdateFactory.newLatLngZoom(ll, 14));
-            CircleOptions circleOptions=new CircleOptions();
+            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(ll, 14));
+            CircleOptions circleOptions = new CircleOptions();
 
             circleOptions.center(ll);
             circleOptions.radius(100);
             circleOptions.fillColor(Color.argb(125, 0, 255, 0));
             circleOptions.strokeColor(Color.GREEN);
-            map.getMap().addCircle(circleOptions);
+            googleMap.addCircle(circleOptions);
+
+            googleMap.setOnMarkerDragListener(new GoogleMap.OnMarkerDragListener() {
+                @Override
+                public void onMarkerDragStart(Marker marker) {
+
+                }
+
+                @Override
+                public void onMarkerDrag(Marker marker) {
+
+                }
+
+                @Override
+                public void onMarkerDragEnd(Marker marker) {
+
+                }
+            });
         }
-    }
+    };
+
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
