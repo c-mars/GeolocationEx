@@ -1,10 +1,13 @@
 package c.mars.geolocationex;
 
+import android.annotation.TargetApi;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Picture;
 import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -16,6 +19,9 @@ import android.widget.Toast;
 
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
+import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.model.CircleOptions;
+import com.google.android.gms.maps.model.LatLng;
 
 import butterknife.ButterKnife;
 import butterknife.InjectView;
@@ -36,7 +42,9 @@ public class MainActivity extends AppCompatActivity {
     @InjectView(R.id.lu)
     Button lu;
 
-    @OnClick(R.id.map)
+    MapFragment map;
+
+    @OnClick(R.id.m)
             void map(){
         startActivity(new Intent(this, MapsActivity.class));
     }
@@ -109,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
                     t.setText(l.toString());
                     locationClient.resolveAddress(l, address -> t.append(" - " + address));
                 }
+                setMap();
             } else {
                 String s = "connected: " + connected;
                 Timber.d(s);
@@ -120,6 +129,26 @@ public class MainActivity extends AppCompatActivity {
 
         if (savedInstanceState != null) {
             locationClient.restoreValuesFromBundle(savedInstanceState, location -> t.setText(location.toString()), m -> t.append(" last: " + m));
+        }
+    }
+
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    private void setMap(){
+        Location location=locationClient.getLocation();
+        if(location==null){
+            return;
+        }
+
+        map = (MapFragment) getFragmentManager().findFragmentById(R.id.map);
+        if(map!=null) {
+            map.getMap().setMyLocationEnabled(true);
+            CircleOptions circleOptions=new CircleOptions();
+            LatLng ll = new LatLng(location.getLatitude(), location.getLongitude());
+            circleOptions.center(ll);
+            circleOptions.radius(100);
+            circleOptions.fillColor(Color.argb(125, 0, 255, 0));
+            circleOptions.strokeColor(Color.GREEN);
+            map.getMap().addCircle(circleOptions);
         }
     }
 
