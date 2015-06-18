@@ -19,7 +19,12 @@
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:layout_below="@+id/t">
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
         <Button
             android:id="@+id/cl"
@@ -40,6 +45,12 @@
             android:layout_height="wrap_content"
             android:enabled="false"
             android:text="geofence"/>
+        </LinearLayout>
+
+        <Button android:id="@+id/map"
+            android:text="map"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
     <ImageView

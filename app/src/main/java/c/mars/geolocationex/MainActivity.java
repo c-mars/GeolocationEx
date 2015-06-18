@@ -1,5 +1,6 @@
 package c.mars.geolocationex;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Picture;
@@ -21,6 +22,7 @@ import butterknife.InjectView;
 import butterknife.OnClick;
 import c.mars.geolocationex.location.LocationClient;
 import c.mars.geolocationex.location.LocationInterface;
+import c.mars.geolocationex.location.MapsActivity;
 import timber.log.Timber;
 
 public class MainActivity extends AppCompatActivity {
@@ -33,6 +35,11 @@ public class MainActivity extends AppCompatActivity {
     Button cl;
     @InjectView(R.id.lu)
     Button lu;
+
+    @OnClick(R.id.map)
+            void map(){
+        startActivity(new Intent(this, MapsActivity.class));
+    }
 
     View[] vs;
     @InjectView(R.id.gf)
